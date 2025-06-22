@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced PDF Chat App</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+        .section {
+            border: 1px solid #e0e0e0;
+            padding: 25px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        h2 {
+            color: #3498db;
+            margin-top: 0;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        #pdf-list {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f0f8ff;
+            border-radius: 4px;
+        }
+        #chat-area {
+            height: 350px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: white;
+            border-radius: 4px;
+        }
+        #question-input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 6px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: auto;
+            text-align: right;
+        }
+        .bot-message {
+            background-color: #f1f1f1;
+            margin-right: auto;
+        }
+        .unknown-message {
+            background-color: #fff3e0;
+            color: #e65100;
+            font-style: italic;
+        }
+        #upload-status {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Enhanced PDF Chat App</h1>
+        
+        <div class="section">
+            <h2>Upload PDF Files</h2>
+            <input type="file" id="pdf-upload" multiple accept=".pdf" style="margin-bottom: 10px;">
+            <button id="upload-btn">Upload & Process</button>
+            <div id="pdf-list"></div>
+            <div id="upload-status"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Ask Questions About Your Documents</h2>
+            <div id="chat-area"></div>
+            <input type="text" id="question-input" placeholder="Type your question about the PDF content here...">
+            <button id="ask-btn">Ask Question</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('upload-btn').addEventListener('click', uploadPDFs);
+        document.getElementById('ask-btn').addEventListener('click', askQuestion);
+        document.getElementById('question-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                askQuestion();
+            }
+        });
+
+        function uploadPDFs() {
+            const files = document.getElementById('pdf-upload').files;
+            if (files.length === 0) {
+                updateStatus('Please select at least one PDF file', 'error');
+                return;
+            }
+
+            const pdfList = document.getElementById('pdf-list');
+            pdfList.innerHTML = '<strong>Selected files:</strong><ul>';
+            for (let i = 0; i < files.length; i++) {
+                pdfList.innerHTML += `<li>${files[i].name}</li>`;
+            }
+            pdfList.innerHTML += '</ul>';
+
+            updateStatus('Uploading and processing PDFs...', 'info');
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('pdf_files', files[i]);
+            }
+
+            fetch('/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    updateStatus(`Error: ${data.error}`, 'error');
+                } else {
+                    updateStatus(data.message, 'success');
+                    // Clear chat area when new files are uploaded
+                    document.getElementById('chat-area').innerHTML = '';
+                }
+            })
+            .catch(error => {
+                updateStatus(`Error: ${error}`, 'error');
+            });
+        }
+
+        function askQuestion() {
+            const questionInput = document.getElementById('question-input');
+            const question = questionInput.value.trim();
+            
+            if (!question) {
+                updateStatus('Please enter a question', 'error');
+                return;
+            }
+
+            const chatArea = document.getElementById('chat-area');
+            chatArea.innerHTML += `<div class="message user-message">You: ${question}</div>`;
+            
+            questionInput.value = '';
+            chatArea.scrollTop = chatArea.scrollHeight;
+
+            updateStatus('Thinking...', 'info');
+
+            fetch('/ask', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ question: question })
+            })
+            .then(response => response.json())
+            .then(data => {
+                clearStatus();
+                let responseClass = 'bot-message';
+                if (data.answer.includes("doesn't appear to be related") || 
+                    data.answer.includes("don't have information")) {
+                    responseClass = 'unknown-message';
+                }
+                chatArea.innerHTML += `<div class="message ${responseClass}">${data.answer}</div>`;
+                chatArea.scrollTop = chatArea.scrollHeight;
+            })
+            .catch(error => {
+                clearStatus();
+                chatArea.innerHTML += `<div class="message unknown-message">Error: ${error}</div>`;
+                chatArea.scrollTop = chatArea.scrollHeight;
+            });
+        }
+
+        function updateStatus(message, type) {
+            const status = document.getElementById('upload-status');
+            status.textContent = message;
+            status.className = type;
+        }
+
+        function clearStatus() {
+            document.getElementById('upload-status').textContent = '';
+        }
+    </script>
+</body>
+</html>
