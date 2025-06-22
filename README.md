@@ -54,5 +54,4 @@ The front-end is built with HTML and served using Flask. It is located in:
 ```
 templates/index.html
 ```
-Feel free to clone/fork this repository and make any changes as you wish
-
+Feel free to clone or fork this repository and make any changes as you wish.
